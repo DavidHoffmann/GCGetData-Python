@@ -359,6 +359,7 @@ def DownloadCacheDetails(browser, cacheUID, cacheDetail):
             cacheDetail.Hint = mHint.group(1).strip()
             cacheDetail.Hint = cacheDetail.Hint.replace('''<br />''', '''\n''')
             cacheDetail.Hint = cacheDetail.Hint.replace('''<br>''', '''\n''')
+            cacheDetail.Hint = HTMLEncode(cacheDetail.Hint)
             
             if DEBUG:
                 logging.debug("GC hint: " + cacheDetail.Hint)
