@@ -548,13 +548,13 @@ def WriteGPXOutput(cacheDetails):
     maxLng = None
     
     for cache in (cacheDetails):
-        if (minLat is None) or (minLat < cache.Latitude):
+        if (minLat is None) or (minLat > cache.Latitude):
             minLat = cache.Latitude
 
-        if (maxLat is None) or (maxLat > cache.Latitude):
+        if (maxLat is None) or (maxLat < cache.Latitude):
             maxLat = cache.Latitude
     
-        if (minLng is None) or (minLng < cache.Longitude):
+        if (minLng is None) or (minLng > cache.Longitude):
             minLng = cache.Longitude
 
         if (maxLng is None) or (maxLng < cache.Longitude):
