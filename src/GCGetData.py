@@ -456,7 +456,7 @@ def GetJsonLog(cacheDetail, jsonLine):
     return cacheDetail
 
 
-def SearchNearest(browser, lat, lng, amount):
+def SearchNearest(browser, lat, lng, amount, isGetMystery):
     if (DEBUG):
         logging.debug("GC SearchStart - Start " + str(lat) + ","+ str(lng) + " count: " + str(amount))
     
@@ -520,11 +520,14 @@ def SearchNearest(browser, lat, lng, amount):
             if matchCacheDetailLinks:
                 for m in matchCacheDetailLinks:
                     if len(cacheDetailLinks) < amount:
-                        if m[1] != "8" and m[2].find("Premium Member Only Cache") == -1:
-                            logging.debug("GC Cache Detail UID: " + m[0])
-                            cacheDetailLinks.append(m[0])
+                        if m[2].find("Premium Member Only Cache") == -1:
+                            if (m[1] != "8" or isGetMystery == True):
+                                logging.debug("GC Cache Detail UID: " + m[0])
+                                cacheDetailLinks.append(m[0])
+                            else:
+                                logging.debug("GC Mystery Cache Detail UID: " + m[0] + " wird ausgelassen")
                         else:
-                            logging.debug("GC Mystery Cache Detail UID: " + m[0] + " wird ausgelassen")
+                            logging.info(m[0] + " = ist ein Premium Member only cache und wird ausgelassen.")
                     else:
                         foundEnough = True
                         break;
@@ -636,7 +639,7 @@ if __name__ == '__main__':
     
     try:
         args = sys.argv[1:]
-        opts, args = getopt.gnu_getopt(args, "u:p:c:d", ["help"])
+        opts, args = getopt.gnu_getopt(args, "u:p:c:d:m:", ["help"])
     except getopt.GetoptError:
         # print help information and exit:
         help()
@@ -647,6 +650,10 @@ if __name__ == '__main__':
     UserLogin = ''
     UserPassword = ''
     Amount = 10
+    
+    IsGetMystery = False
+    MysteryLat = None
+    MysteryLng = None
     
     for o, a in opts:
         if o == "-u":
@@ -660,6 +667,10 @@ if __name__ == '__main__':
             DEBUG = True
         if o == "-c":
             Amount = int(a)
+            
+        if o == "-m":
+            IsGetMystery = True
+            MysteryLat, MysteryLng = a.split(",")
     
     if len(args) < 1:
         help()
@@ -671,6 +682,9 @@ if __name__ == '__main__':
         MaxDistance = args[2]
     else:
         MaxDistance = "999"
+        
+    if IsGetMystery:
+        Amount = 1
         
     if (DEBUG):
         logging.debug("Programm Start")
@@ -697,7 +711,7 @@ if __name__ == '__main__':
         sys.exit(3)
     
     logging.info("GC SearchNearest")    
-    cacheDetailUIDs = SearchNearest(browser, lat, lng, Amount)
+    cacheDetailUIDs = SearchNearest(browser, lat, lng, Amount, IsGetMystery)
        
     cacheDetails = []
     
@@ -714,6 +728,11 @@ if __name__ == '__main__':
             try:
                 DownloadCacheDetails(browser, cacheUID, cacheDetail)
                 DownloadSendToGPS(browser, cacheUID, cacheDetail)
+                
+                # Change Mystery-Coordinates
+                if IsGetMystery:
+                    cacheDetail.Latitude = MysteryLat
+                    cacheDetail.Longitude = MysteryLng
                 
                 cacheDetails.append(cacheDetail)
             except Exception, ex:
