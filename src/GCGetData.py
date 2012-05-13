@@ -56,7 +56,20 @@ class LogDetail(object):
         self.LogID = ''
         self.Text = ''
 
-import sys, getopt, time, logging, random, json
+class WayPoint(object):
+    def __init__(self):
+        self.Latitude = None
+        self.Longitude = None
+        self.Created = None
+        self.Name = None
+        self.Comment = None
+        self.Description = None
+        self.Url = None
+        self.UrlName = None
+        self.Sym = None
+        self.Type = None        
+
+import sys, getopt, time, logging, random, json, tempfile, os.path
 
 def help():
     print """Bitte die folgenden Parameter in der gleichen Reihenfolge anwenden.
@@ -65,7 +78,7 @@ def help():
     """
     
 def RandomWait():
-    rndTime = random.uniform(3, 10)
+    rndTime = random.uniform(5, 15)
     
     if (DEBUG):
         logging.debug("RandomWait - Start - %f", rndTime)
@@ -91,7 +104,9 @@ def GCLogin(browser, userLogin, userPassword):
     
     try:
         RandomWait()
-        browser.open("http://geocaching.com/login/")
+        url = "http://geocaching.com/login/"
+        browser.open(url)
+        logging.debug(url)
         
         browser.select_form(nr = 0)
         browser["ctl00$ContentBody$tbUsername"] = userLogin
@@ -105,7 +120,8 @@ def GCLogin(browser, userLogin, userPassword):
             logging.debug("Login ok")
             return True
         else:
-            logging.debug("Login failed")
+            logging.warn("Login failed")
+            logging.debug(browserResponse)
             return False
     except Exception, ex:
         logging.error("GC Login failed - ex: " + str(ex))
@@ -122,7 +138,11 @@ def DownloadSendToGPS(browser, cacheUID, cacheDetail):
     
     try:
         RandomWait()
-        browser.open("http://www.geocaching.com/seek/sendtogps.aspx?guid=" + cacheUID)
+        url = "http://www.geocaching.com/seek/sendtogps.aspx?guid=" + cacheUID
+        browser.open(url)
+        
+        logging.debug(url)
+        
         browserResponse = browser.response().read()
         
     except Exception, ex:
@@ -283,7 +303,7 @@ def DownloadSendToGPS(browser, cacheUID, cacheDetail):
     
         
         
-def DownloadCacheDetails(browser, cacheUID, cacheDetail):
+def DownloadCacheDetails(browser, cacheUID, cacheDetail, waypoints):
     
     if (DEBUG):
         logging.debug("GC Download Cache Details - Start - " + cacheUID)
@@ -291,8 +311,14 @@ def DownloadCacheDetails(browser, cacheUID, cacheDetail):
     browserResponse = ""
     try:
         RandomWait()
-        browser.open("http://www.geocaching.com/seek/cache_details.aspx?guid=" + cacheUID + "&log=y&decrypt=y")
+        url = "http://www.geocaching.com/seek/cache_details.aspx?guid=" + cacheUID + "&log=y&decrypt=y"
+        browser.open(url)
+        
+        logging.debug(url)
+        
         browserResponse = browser.response().read()
+        
+        logging.fatal(browserResponse)
         
     except Exception, ex:
         logging.error("GC DownloadCacheDetails failed - ex: " + str(ex))
@@ -398,16 +424,27 @@ def DownloadCacheDetails(browser, cacheUID, cacheDetail):
         
         if mLogJson:
             # load json
-            jsonLine = "{" + mLogJson.group(1).strip() + "}"
-            cacheDetail = GetJsonLog(cacheDetail, jsonLine)
+            jsonLineL = "{" + mLogJson.group(1).strip() + "}"
+            cacheDetail = GetJsonLog(cacheDetail, jsonLineL)
                         
             if DEBUG:
-                logging.debug("GC log json: " + jsonLine)
+                logging.debug("GC log json: " + jsonLineL)
         else:
             logging.warn("Details - Log Json not found")
             
+        # Waypoints suchen
+        reWaypoints = re.compile('cmapAdditionalWaypoints = \[\{(.+?)\}\];')
+        mWaypoints = reWaypoints.search(browserResponse)
+        
+        if mWaypoints:
+            jsonLineW = "[{" + mWaypoints.group(1).strip() + "}]"
+            waypoints= GetJsonWaypoints(waypoints, jsonLineW)
+
+            logging.debug("GC waypoints json: " + jsonLineW)
+            
     if (DEBUG):
         logging.debug("GC Download Cache Details - Ende - " + cacheUID)
+        
     return cacheDetails            
         
 
@@ -455,6 +492,30 @@ def GetJsonLog(cacheDetail, jsonLine):
     
     return cacheDetail
 
+def GetJsonWaypoints(waypoints, jsonLine):
+    try:
+        if jsonLine and len(jsonLine) > 0:
+            j = json.loads(jsonLine)
+        
+        for wJItem in (j):
+            wp = WayPoint()
+            wp.Latitude = float(wJItem['lat'])
+            wp.Longitude = float(wJItem['lng'])
+            
+            if wJItem['name']:
+                reName = re.compile('(.*?) \( (.*?) \)')
+                mName = reName.search(wJItem['name'])
+                
+                if mName:
+                    wp.Comment = mName.group(1).strip()
+                    wp.Type = mName.group(2).strip()
+            
+            waypoints.append(wp)
+            
+    except Exception, ex:
+        logging.error('GC GetJsonWaypoints - ex: ' + str(ex))
+        
+    return waypoints
 
 def SearchNearest(browser, lat, lng, amount, isGetMystery):
     if (DEBUG):
@@ -471,9 +532,14 @@ def SearchNearest(browser, lat, lng, amount, isGetMystery):
             # Beim ersten Mal die Seite direkt aufrufen
             if nIndex == 1:
                 RandomWait()
-                browser.open("http://www.geocaching.com/seek/nearest.aspx?lat=" + lat + "&lng=" + lng + "&ex=1&cFilter=9a79e6ce-3344-409c-bbe9-496530baf758&children=n")
+                url = "http://www.geocaching.com/seek/nearest.aspx?lat=" + lat + "&lng=" + lng + "&ex=1&cFilter=9a79e6ce-3344-409c-bbe9-496530baf758&children=n"
+                browser.open(url)
+                
+                logging.debug(url)
                 
                 browserResponse = browser.response().read()
+                
+                logging.debug("### SEARCH NEAREST ###\n" + browserResponse)
                 
                 # Search total records
                 reTotalRecords = re.compile("Total Records: <b>([0-9]*?)</b>")
@@ -543,7 +609,7 @@ def SearchNearest(browser, lat, lng, amount, isGetMystery):
         
     return cacheDetailLinks
 
-def WriteGPXOutput(cacheDetails):
+def WriteGPXOutput(cacheDetails, waypoints):
     
     minLat = None
     maxLat = None
@@ -562,6 +628,19 @@ def WriteGPXOutput(cacheDetails):
 
         if (maxLng is None) or (maxLng < cache.Longitude):
             maxLng = cache.Longitude
+
+    for wp in (waypoints):
+        if (minLat is None) or (minLat > wp.Latitude):
+            minLat = wp.Latitude
+
+        if (maxLat is None) or (maxLat < wp.Latitude):
+            maxLat = wp.Latitude
+    
+        if (minLng is None) or (minLng > wp.Longitude):
+            minLng = wp.Longitude
+
+        if (maxLng is None) or (maxLng < wp.Longitude):
+            maxLng = wp.Longitude
     
     gpxOutput = '''<?xml version="1.0" encoding="utf-8"?>
 <gpx xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0" creator="Groundspeak, Inc. All  Rights Reserved. http://www.groundspeak.com" xsi:schemaLocation="http://www.topografix.com/GPX/1/0  http://www.topografix.com/GPX/1/0/gpx.xsd http://www.groundspeak.com/cache/1/0  http://www.groundspeak.com/cache/1/0/cache.xsd" xmlns="http://www.topografix.com/GPX/1/0">
@@ -609,12 +688,26 @@ def WriteGPXOutput(cacheDetails):
                     <groundspeak:text encoded="False">''' + log.Text + '''</groundspeak:text>
                 </groundspeak:log>
 '''
-            
         gpxOutput += '''            </groundspeak:logs>
-            <!-- groundspeak:travelbugs / -->
         </groundspeak:cache>
     </wpt>
 '''
+    for w in (waypoints):
+        gpxTmpOutput = ''
+        try:
+            gpxTmpOutput = '''    <wpt lat="''' + str(w.Latitude) + '''" lon="''' + str(w.Longitude) + '''">
+        <!-- name>''' + w.Comment + '''</name -->
+        <cmt>''' + w.Comment + '''</cmt>
+        <sym>''' + w.Type + '''</sym>
+        <type>Waypoint|''' + w.Type + '''</type>
+    </wpt>
+'''
+            gpxTmpOutput = gpxTmpOutput.encode('utf-8')
+        except Exception, ex:
+            logging.fatal(ex)
+            
+        if gpxTmpOutput and gpxTmpOutput != '':
+            gpxOutput += gpxTmpOutput
 
     gpxOutput += '''</gpx>'''
     
@@ -627,15 +720,19 @@ def HTMLEncode(string):
     s = s.replace('''&quot;''', '''"''')
     
     return s
-   
+
+def SignOff(browser):
+    logging.debug("SignOff")
+    RandomWait()
+
+    url = "http://www.geocaching.com/login/default.aspx?RESET=Y"
+    browser.open(url)
+    
+    logging.debug(url)
+    
+    browser.response().read()
 
 if __name__ == '__main__':
-
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
-                        datefmt='%a, %d %b %Y %H:%M:%S',
-                        filename='/tmp/gcGetData.log',
-                        filemode='w')
     
     try:
         args = sys.argv[1:]
@@ -675,6 +772,18 @@ if __name__ == '__main__':
     if len(args) < 1:
         help()
         sys.exit()
+
+    logFile = os.path.join(tempfile.gettempdir(), 'gcGetData.log')
+    logLevel = logging.INFO
+    
+    if DEBUG:
+        logLevel = logging.DEBUG
+
+    logging.basicConfig(level=logLevel,
+                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        datefmt='%a, %d %b %Y %H:%M:%S',
+                        filename= logFile,
+                        filemode='w')
         
     lat, lng = args[0].split(",")
     
@@ -714,6 +823,7 @@ if __name__ == '__main__':
     cacheDetailUIDs = SearchNearest(browser, lat, lng, Amount, IsGetMystery)
        
     cacheDetails = []
+    waypoints = []
     
     nCount = 1
     
@@ -726,7 +836,7 @@ if __name__ == '__main__':
             cacheDetail = GeoCache()
             cacheDetail.Guid = cacheUID
             try:
-                DownloadCacheDetails(browser, cacheUID, cacheDetail)
+                DownloadCacheDetails(browser, cacheUID, cacheDetail, waypoints)
                 DownloadSendToGPS(browser, cacheUID, cacheDetail)
                 
                 # Change Mystery-Coordinates
@@ -737,8 +847,9 @@ if __name__ == '__main__':
                 cacheDetails.append(cacheDetail)
             except Exception, ex:
                 logging.error("GC Download Details - ex: " + str(ex))
-    
-    gpxOutput = WriteGPXOutput(cacheDetails)
+
+    SignOff(browser)    
+    gpxOutput = WriteGPXOutput(cacheDetails, waypoints)
     
     print gpxOutput
     
