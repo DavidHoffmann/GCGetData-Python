@@ -6,7 +6,9 @@ Tool zur Erstellung von GPX Dateien mit deren Hilfe das Geocachen mit Garmin GPS
 Voraussetzung
 -------------
 Python
+
 Version: 2.7 (wurde für die Entwicklung und den Test verwendet)
+
 Pythonmodul: mechanize
 
 Beispiele
