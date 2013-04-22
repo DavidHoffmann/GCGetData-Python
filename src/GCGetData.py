@@ -116,7 +116,7 @@ def GCLogin(browser, userLogin, userPassword):
         
         browserResponse = browser.response().read()
         
-        if (re.search("You are logged in as", browserResponse)):
+        if (re.search("You are signed in as", browserResponse)):
             logging.debug("Login ok")
             return True
         else:
@@ -696,7 +696,7 @@ def WriteGPXOutput(cacheDetails, waypoints):
         gpxTmpOutput = ''
         try:
             gpxTmpOutput = '''    <wpt lat="''' + str(w.Latitude) + '''" lon="''' + str(w.Longitude) + '''">
-        <!-- name>''' + w.Comment + '''</name -->
+        <name>''' + w.Comment + '''</name>
         <cmt>''' + w.Comment + '''</cmt>
         <sym>''' + w.Type + '''</sym>
         <type>Waypoint|''' + w.Type + '''</type>
