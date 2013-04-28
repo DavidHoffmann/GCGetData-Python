@@ -72,10 +72,9 @@ class WayPoint(object):
 import sys, getopt, time, logging, random, json, tempfile, os.path
 
 def help():
-    print """Bitte die folgenden Parameter in der gleichen Reihenfolge anwenden.
-    -u USERNAME -p PASSWORT -c COUNT LAT,LNG
-    -u USERNAME -p PASSWORT -c 10 52.235524,10.542667
-    """
+    print ("Bitte die folgenden Parameter in der gleichen Reihenfolge anwenden.")
+    print (" -u USERNAME -p PASSWORT -c COUNT LAT,LNG")
+    print (" -u USERNAME -p PASSWORT -c 10 52.235524,10.542667")
     
 def RandomWait():
     rndTime = random.uniform(5, 15)
@@ -128,7 +127,7 @@ def GCLogin(browser, userLogin, userPassword):
             logging.warn("Login failed")
             logging.debug(browserResponse)
             return False
-    except Exception, ex:
+    except Exception as ex:
         logging.error("GC Login failed - ex: " + str(ex))
         sys.exit(1)        
     
@@ -150,7 +149,7 @@ def DownloadSendToGPS(browser, cacheUID, cacheDetail):
         
         browserResponse = browser.response().read()
         
-    except Exception, ex:
+    except Exception as ex:
         logging.error("GC download sendtogps failed - ex: " + str(ex))
         
     if browserResponse and browserResponse != "":
@@ -325,7 +324,7 @@ def DownloadCacheDetails(browser, cacheUID, cacheDetail, waypoints):
         
         logging.fatal(browserResponse)
         
-    except Exception, ex:
+    except Exception as ex:
         logging.error("GC DownloadCacheDetails failed - ex: " + str(ex))
         
     if browserResponse and browserResponse != "":
@@ -492,7 +491,7 @@ def GetJsonLog(cacheDetail, jsonLine):
             if DEBUG:
                 logging.debug("GC found " + str(nCount) +" logs - (max 50)")
         
-    except Exception, ex:
+    except Exception as ex:
         logging.error("GC GetJsonLog - ex: " + str(ex))
     
     return cacheDetail
@@ -517,7 +516,7 @@ def GetJsonWaypoints(waypoints, jsonLine):
             
             waypoints.append(wp)
             
-    except Exception, ex:
+    except Exception as ex:
         logging.error('GC GetJsonWaypoints - ex: ' + str(ex))
         
     return waypoints
@@ -556,7 +555,7 @@ def SearchNearest(browser, lat, lng, amount, isGetMystery):
             
             # Link "Next" aufrufen
             else:
-                if browserResponse and browserResponse <> "":
+                if browserResponse and browserResponse != "":
                     reNextLink = re.compile("ctl00\$ContentBody\$pgrTop\$ctl08")
                     matchNextLink = reNextLink.search(browserResponse) 
 
@@ -603,7 +602,7 @@ def SearchNearest(browser, lat, lng, amount, isGetMystery):
                         foundEnough = True
                         break;
                         
-        except Exception, ex:
+        except Exception as ex:
             logging.error("GC SearchStart failed - ex: " + str(ex))
             sys.exit(1)  
             
@@ -708,7 +707,7 @@ def WriteGPXOutput(cacheDetails, waypoints):
     </wpt>
 '''
             gpxTmpOutput = gpxTmpOutput.encode('utf-8')
-        except Exception, ex:
+        except Exception as ex:
             logging.fatal(ex)
             
         if gpxTmpOutput and gpxTmpOutput != '':
@@ -850,12 +849,12 @@ if __name__ == '__main__':
                     cacheDetail.Longitude = MysteryLng
                 
                 cacheDetails.append(cacheDetail)
-            except Exception, ex:
+            except Exception as ex:
                 logging.error("GC Download Details - ex: " + str(ex))
 
     SignOff(browser)    
     gpxOutput = WriteGPXOutput(cacheDetails, waypoints)
     
-    print gpxOutput
+    print (gpxOutput)
     
     logging.info("Programm Ende")
