@@ -72,20 +72,23 @@ class WayPoint(object):
         self.Type = None        
 
 class GCGetData(object):
-    def __init__(self):
+    def __init__(self, debug):
         import os.path, tempfile
 
         logFile = os.path.join(tempfile.gettempdir(), 'GCGetData.log')
-        logLevel = logging.INFO
 
-        if DEBUG:
+        if debug:
             logLevel = logging.DEBUG
+        else:
+            logLevel = logging.INFO
 
         logging.basicConfig(level = logLevel,
             format = '%(asctime)s %(levelname)-8s %(message)s',
             datefmt = '%a, %d %b %Y %H:%M:%S',
             filename = logFile,
             filemode = 'w')
+
+        self.__logging = logging
 
         import re, mechanize, cgi
 
@@ -98,7 +101,7 @@ class GCGetData(object):
         self.__browser.set_handle_robots(False)
         self.__browser.addheaders = [('User-Agent', userAgent)]
 
-        if (DEBUG):
+        if (debug):
             self.__browser.set_debug_http(False)
             self.__browser.set_debug_redirects(False)
             self.__browser.set_debug_responses(False)
@@ -113,13 +116,13 @@ class GCGetData(object):
 
 
     def GetGPX(self, userLogin, userPassword, lat, lng, amount, isGetMystery, mysteryLat, mysteryLng):
-        logging.info("GC Login")
+        self.__logging.info("GC Login")
 
         if (self.__GCLogin(self.__browser, userLogin, userPassword) == False):
             print ("Login failed")
             sys.exit(3)
 
-        logging.info("GC SearchNearest")
+        self.__logging.info("GC SearchNearest")
         cacheDetailUIDs = self.__SearchNearest(self.__browser, lat, lng, amount, isGetMystery)
 
         cacheDetails = []
@@ -130,7 +133,7 @@ class GCGetData(object):
         if (cacheDetailUIDs) and (len(cacheDetailUIDs) > 0):
             for cacheUID in cacheDetailUIDs:
 
-                logging.info("Download GC (" + str(nCount) + "/" + str(amount) + ")")
+                self.__logging.info("Download GC (" + str(nCount) + "/" + str(amount) + ")")
                 nCount = nCount + 1
 
                 cacheDetail = GeoCache()
@@ -146,7 +149,7 @@ class GCGetData(object):
 
                     cacheDetails.append(cacheDetail)
                 except Exception as ex:
-                    logging.error("GC Download Details - ex: " + str(ex))
+                    self.__logging.error("GC Download Details - ex: " + str(ex))
 
         self.__SignOff(self.__browser)
         return  self.__WriteGPXOutput(cacheDetails, waypoints)
@@ -156,13 +159,11 @@ class GCGetData(object):
         """wait 5-15 seconds."""
         rndTime = random.uniform(5, 15)
     
-        if (DEBUG):
-            logging.debug("RandomWait - Start - %f", rndTime)
+        self.__logging.debug("RandomWait - Start - %f", rndTime)
         
         time.sleep(rndTime)
     
-        if (DEBUG):
-            logging.debug("RandomWait - Ende")
+        self.__logging.debug("RandomWait - Ende")
 
 
     def __GetRandomUserAgent(self):
@@ -177,8 +178,7 @@ class GCGetData(object):
         # get first random browser
         curBrowser = browsers[0]
 
-        if (DEBUG):
-            logging.debug("Current Browser: " + curBrowser)
+        self.__logging.debug("Current Browser: " + curBrowser)
     
         return curBrowser
 
@@ -186,8 +186,7 @@ class GCGetData(object):
     def __GCLogin(self, browser, userLogin, userPassword):
         """do the login at geocaching.com"""
 
-        if (DEBUG):
-            logging.debug("GC Login - Start")
+        self.__logging.debug("GC Login - Start")
     
         try:
             self.__RandomWait()
@@ -195,8 +194,7 @@ class GCGetData(object):
             url = "http://geocaching.com/login/"
             browser.open(url)
 
-            if (DEBUG):
-                logging.debug(url)
+            self.__logging.debug(url)
         
             browser.select_form(nr = 0)
             browser["ctl00$ContentBody$tbUsername"] = userLogin
@@ -207,23 +205,21 @@ class GCGetData(object):
             browserResponse = browser.response().read()
         
             if (re.search("You are signed in as", browserResponse)):
-                logging.debug("Login ok")
+                self.__logging.debug("Login ok")
                 return True
             else:
-                logging.warn("Login failed")
-                logging.debug(browserResponse)
+                self.__logging.warn("Login failed")
+                self.__logging.debug(browserResponse)
                 return False
         except Exception as ex:
-            logging.error("GC Login failed - ex: " + str(ex))
+            self.__logging.error("GC Login failed - ex: " + str(ex))
             sys.exit(1)        
     
-        if (DEBUG):
-            logging.debug("GC Login - Ende")
+        self.__logging.debug("GC Login - Ende")
         
 
     def __DownloadSendToGPS(self, browser, cacheUID, cacheDetail):
-        if (DEBUG):
-            logging.debug("GC download sendtogps - Start - " + cacheUID)
+        self.__logging.debug("GC download sendtogps - Start - " + cacheUID)
 
         browserResponse = ""
     
@@ -232,12 +228,12 @@ class GCGetData(object):
             url = "http://www.geocaching.com/seek/sendtogps.aspx?guid=" + cacheUID
             browser.open(url)
         
-            logging.debug(url)
+            self.__logging.debug(url)
         
             browserResponse = browser.response().read()
         
         except Exception as ex:
-            logging.error("GC download sendtogps failed - ex: " + str(ex))
+            self.__logging.error("GC download sendtogps failed - ex: " + str(ex))
         
         if browserResponse and browserResponse != "":
                 
@@ -248,10 +244,9 @@ class GCGetData(object):
             if mLat:
                 cacheDetail.Latitude = float(mLat.group(1).strip())
             
-                if DEBUG:
-                    logging.debug("GC latitude: " + str(cacheDetail.Latitude))
+                self.__logging.debug("GC latitude: " + str(cacheDetail.Latitude))
             else:
-                logging.warn("SendToGPS - latitude not found")
+                self.__logging.warn("SendToGPS - latitude not found")
             
             # --- pt.longitude = 10.543611;
             reLng = re.compile("pt.longitude = (\d*?\.\d*?);")
@@ -260,10 +255,9 @@ class GCGetData(object):
             if mLng:
                 cacheDetail.Longitude = float(mLng.group(1).strip())
             
-                if DEBUG:
-                    logging.debug("GC longitude: " + str(cacheDetail.Longitude))
+                self.__logging.debug("GC longitude: " + str(cacheDetail.Longitude))
             else:
-                logging.warn("SendToGPS - longitude not found")
+                self.__logging.warn("SendToGPS - longitude not found")
         
             # --- pt.created     = '2008-03-25T00:00:00';
             reDate = re.compile("pt.created     = \'(.*?)\';")
@@ -272,10 +266,9 @@ class GCGetData(object):
             if mDate:
                 cacheDetail.Created = mDate.group(1)
             
-                if DEBUG:
-                    logging.debug("GC date: " + cacheDetail.Created)
+                self.__logging.debug("GC date: " + cacheDetail.Created)
             else:
-                logging.warn("SendToGPS - created not found")
+                self.__logging.warn("SendToGPS - created not found")
         
             # --- pt.id = 'GC1AJ40';
             reGCCode = re.compile("pt.id = \'(.*?)\';")
@@ -284,10 +277,9 @@ class GCGetData(object):
             if mGCCode:
                 cacheDetail.GCCode = mGCCode.group(1)
             
-                if DEBUG:
-                    logging.debug("GC GCCode: " + cacheDetail.GCCode)
+                self.__logging.debug("GC GCCode: " + cacheDetail.GCCode)
             else:
-                logging.warn("SendToGPS - GCCode not found")
+                self.__logging.warn("SendToGPS - GCCode not found")
         
             # --- pt.label = 'Geschichte der Ari 1';
             reLabel = re.compile("pt.label = \'(.*?)\';")
@@ -300,10 +292,9 @@ class GCGetData(object):
                     cacheDetail.Label = self.__HTMLEncode(cacheDetail.Label)
                     cacheDetail.Label = cacheDetail.Label.replace("\\'", "'")
             
-                if DEBUG:
-                    logging.debug("GC label: " + cacheDetail.Label)
+                self.__logging.debug("GC label: " + cacheDetail.Label)
             else:
-                logging.warn("SendToGPS - label not found")
+                self.__logging.warn("SendToGPS - label not found")
             
             # --- pt.owner       = 'kiowan';
             reOwner = re.compile("pt.owner       = \'(.*?)\';")
@@ -312,10 +303,9 @@ class GCGetData(object):
             if mOwner:
                 cacheDetail.Owner = mOwner.group(1)
             
-                if DEBUG:
-                    logging.debug("GC owner: " + cacheDetail.Owner)
+                self.__logging.debug("GC owner: " + cacheDetail.Owner)
             else:
-                logging.warn("SendToGPS - owner not found")
+                self.__logging.warn("SendToGPS - owner not found")
                     
             # --- pt.difficulty = 1;
             reDifficulty = re.compile("pt.difficulty = (.*?);")
@@ -324,10 +314,9 @@ class GCGetData(object):
             if mDifficulty:
                 cacheDetail.Difficulty = mDifficulty.group(1)
             
-                if DEBUG:
-                    logging.debug("GC difficulty: " + cacheDetail.Difficulty)
+                self.__logging.debug("GC difficulty: " + cacheDetail.Difficulty)
             else:
-                logging.warn("SendToGPS - difficulty not found")
+                self.__logging.warn("SendToGPS - difficulty not found")
             
             # --- pt.terrain = 1;
             reTerrain = re.compile("pt.terrain = (.*?);")
@@ -336,10 +325,9 @@ class GCGetData(object):
             if mTerrain:
                 cacheDetail.Terrain = mTerrain.group(1)
             
-                if DEBUG:
-                    logging.debug("GC terrain: " + cacheDetail.Terrain)
+                self.__logging.debug("GC terrain: " + cacheDetail.Terrain)
             else:
-                logging.warn("SendToGPS - terrain not found")
+                self.__logging.warn("SendToGPS - terrain not found")
             
             # --- pt.type = 'Traditional Cache';
             reType = re.compile("pt.type = \'(.*?)\';")
@@ -348,10 +336,9 @@ class GCGetData(object):
             if mType:
                 cacheDetail.Type = mType.group(1)
             
-                if DEBUG:
-                    logging.debug("GC type: " + cacheDetail.Type)
+                self.__logging.debug("GC type: " + cacheDetail.Type)
             else:
-                logging.warn("SendToGPS - type not found")
+                self.__logging.warn("SendToGPS - type not found")
             
             # --- pt.container   = 'Micro';
             reContainer = re.compile("pt.container   = \'(.*?)\';")
@@ -360,10 +347,9 @@ class GCGetData(object):
             if mContainer:
                 cacheDetail.Container = mContainer.group(1)
             
-                if DEBUG:
-                    logging.debug("GC container: " + cacheDetail.Container)
+                self.__logging.debug("GC container: " + cacheDetail.Container)
             else:
-                logging.warn("SendToGPS - Container not found")
+                self.__logging.warn("SendToGPS - Container not found")
         
             # --- pt.country     = 'Germany';
             reCountry = re.compile("pt.country     = \'(.*?)\';")
@@ -372,10 +358,9 @@ class GCGetData(object):
             if mCountry:
                 cacheDetail.Country = mCountry.group(1)
             
-                if DEBUG:
-                    logging.debug("GC country: " + cacheDetail.Country)
+                self.__logging.debug("GC country: " + cacheDetail.Country)
             else:
-                logging.warn("SendToGPS - country not found")
+                self.__logging.warn("SendToGPS - country not found")
             
             # --- pt.state       = 'Niedersachsen';
             reState = re.compile("pt.state       = \'(.*?)\';")
@@ -384,19 +369,16 @@ class GCGetData(object):
             if mState:
                 cacheDetail.State = mState.group(1)
             
-                if DEBUG:
-                   logging.debug("GC state: " + cacheDetail.State)
+                self.__logging.debug("GC state: " + cacheDetail.State)
             else:
-                logging.warn("SendToGPS - state not found")
+                self.__logging.warn("SendToGPS - state not found")
         
-        if (DEBUG):
-            logging.debug("GC download sendtogps - Ende - " + cacheUID)
+        self.__logging.debug("GC download sendtogps - Ende - " + cacheUID)
 
     
     def __DownloadCacheDetails(self, browser, cacheUID, cacheDetail, waypoints):
     
-        if (DEBUG):
-            logging.debug("GC Download Cache Details - Start - " + cacheUID)
+        self.__logging.debug("GC Download Cache Details - Start - " + cacheUID)
     
         browserResponse = ""
         try:
@@ -404,14 +386,14 @@ class GCGetData(object):
             url = "http://www.geocaching.com/seek/cache_details.aspx?guid=" + cacheUID + "&log=y&decrypt=y"
             browser.open(url)
         
-            logging.debug(url)
+            self.__logging.debug(url)
         
             browserResponse = browser.response().read()
          
-            logging.fatal(browserResponse)
+            self.__logging.debug(browserResponse)
         
         except Exception as ex:
-            logging.error("GC DownloadCacheDetails failed - ex: " + str(ex))
+            self.__logging.error("GC DownloadCacheDetails failed - ex: " + str(ex))
         
         if browserResponse and browserResponse != "":
         
@@ -422,10 +404,9 @@ class GCGetData(object):
             if mGCID:
                 cacheDetail.ID = mGCID.group(1).strip()
             
-                if DEBUG:
-                    logging.debug("GC GCID: " + cacheDetail.ID)
+                self.__logging.debug("GC GCID: " + cacheDetail.ID)
             else:
-                logging.warn("Details - GC ID not found")
+                self.__logging.warn("Details - GC ID not found")
                 
             # --- short desc
             reShortDesc = re.compile("\<span id=\"ctl00_ContentBody_ShortDescription\"\>(.*?)\</span\>", re.S)
@@ -442,10 +423,9 @@ class GCGetData(object):
                 else:
                     cacheDetail.ShortDesc = tmpShortDesc
             
-                if DEBUG:
-                    logging.debug("GC shortDesc: " + cacheDetail.ShortDesc)
+                self.__logging.debug("GC shortDesc: " + cacheDetail.ShortDesc)
             else:
-                logging.warn("Details - shortDesc not found")
+                self.__logging.warn("Details - shortDesc not found")
         
             # --- long desc
             reLongDesc = re.compile("\<span id=\"ctl00_ContentBody_LongDescription\"\>(.*?)\</span\>\r\n            \r\n        \</div\>", re.S)
@@ -462,10 +442,9 @@ class GCGetData(object):
                 else:
                     cacheDetail.LongDesc = tmpLongDesc
             
-                if DEBUG:
-                    logging.debug("GC longDesc: " + cacheDetail.LongDesc)
+                self.__logging.debug("GC longDesc: " + cacheDetail.LongDesc)
             else:
-                logging.warn("Details - longDesc not found")
+                self.__logging.warn("Details - longDesc not found")
 
             # --- hint
             reHint = re.compile("\<div id=\"div_hint\".*?\>(.*?)\</div\>", re.S)
@@ -477,10 +456,9 @@ class GCGetData(object):
                 cacheDetail.Hint = cacheDetail.Hint.replace('''<br>''', '''\n''')
                 cacheDetail.Hint = self.__HTMLEncode(cacheDetail.Hint)
             
-                if DEBUG:
-                    logging.debug("GC hint: " + cacheDetail.Hint)
+                self.__logging.debug("GC hint: " + cacheDetail.Hint)
             else:
-                logging.warn("Details - hint not found")
+                self.__logging.warn("Details - hint not found")
             
             # --- unavailable
             reUnavailable = re.compile("\<strong\>Cache Issues:\<\/strong\>\<\/p\>\<ul class=\"OldWarning\"\>\<li\>This cache is temporarily unavailable.", re.S)
@@ -489,8 +467,7 @@ class GCGetData(object):
             if mUnavailable:
                 cacheDetail.Available = False
             
-                if DEBUG:
-                    logging.debug("GC unavailable: " + str(cacheDetail.Available))
+                self.__logging.debug("GC unavailable: " + str(cacheDetail.Available))
             else:
                 cacheDetail.Available = True
             
@@ -502,8 +479,7 @@ class GCGetData(object):
                 cacheDetail.Archived = True
                 cacheDetail.Active = False
             
-                if DEBUG:
-                    logging.debug("GC archived: " + str(cacheDetail.Archived))
+                self.__logging.debug("GC archived: " + str(cacheDetail.Archived))
             else:
                 cacheDetail.Archived = False
                 cacheDetail.Active = True
@@ -517,10 +493,9 @@ class GCGetData(object):
                 jsonLineL = "{" + mLogJson.group(1).strip() + "}"
                 cacheDetail = self.__GetJsonLog(cacheDetail, jsonLineL)
                         
-                if DEBUG:
-                   logging.debug("GC log json: " + jsonLineL)
+                self.__logging.debug("GC log json: " + jsonLineL)
             else:
-                logging.warn("Details - Log Json not found")
+                self.__logging.warn("Details - Log Json not found")
             
             # Waypoints suchen
             reWaypoints = re.compile('cmapAdditionalWaypoints = \[\{(.+?)\}\];')
@@ -530,10 +505,9 @@ class GCGetData(object):
                 jsonLineW = "[{" + mWaypoints.group(1).strip() + "}]"
                 waypoints= self.__GetJsonWaypoints(waypoints, jsonLineW)
 
-                logging.debug("GC waypoints json: " + jsonLineW)
+                self.__logging.debug("GC waypoints json: " + jsonLineW)
             
-        if (DEBUG):
-            logging.debug("GC Download Cache Details - Ende - " + cacheUID)
+        self.__logging.debug("GC Download Cache Details - Ende - " + cacheUID)
         
 
     def __GetJsonLog(self, cacheDetail, jsonLine):
@@ -572,11 +546,10 @@ class GCGetData(object):
             if logs:
                 cacheDetail.Logs = logs
             
-                if DEBUG:
-                    logging.debug("GC found " + str(nCount) +" logs - (max 50)")
+                self.__logging.debug("GC found " + str(nCount) +" logs - (max 50)")
         
         except Exception as ex:
-            logging.error("GC GetJsonLog - ex: " + str(ex))
+            self.__logging.error("GC GetJsonLog - ex: " + str(ex))
     
         return cacheDetail
 
@@ -602,14 +575,13 @@ class GCGetData(object):
                 waypoints.append(wp)
             
         except Exception as ex:
-            logging.error('GC GetJsonWaypoints - ex: ' + str(ex))
+            self.__logging.error('GC GetJsonWaypoints - ex: ' + str(ex))
         
         return waypoints
 
 
     def __SearchNearest(self, browser, lat, lng, amount, isGetMystery):
-        if (DEBUG):
-            logging.debug("GC SearchStart - Start " + str(lat) + ","+ str(lng) + " count: " + str(amount))
+        self.__logging.debug("GC SearchStart - Start " + str(lat) + ","+ str(lng) + " count: " + str(amount))
     
         cacheDetailLinks = []
         nIndex = 1
@@ -625,19 +597,18 @@ class GCGetData(object):
                     url = "http://www.geocaching.com/seek/nearest.aspx?lat=" + lat + "&lng=" + lng + "&ex=1&cFilter=9a79e6ce-3344-409c-bbe9-496530baf758&children=n"
                     browser.open(url)
                 
-                    logging.debug(url)
+                    self.__logging.debug(url)
                 
                     browserResponse = browser.response().read()
                 
-                    logging.debug("### SEARCH NEAREST ###\n" + browserResponse)
+                    self.__logging.debug("### SEARCH NEAREST ###\n" + browserResponse)
                 
                     # Search total records
                     reTotalRecords = re.compile("Total Records: <b>([0-9]*?)</b>")
                     matchTotalRecords = reTotalRecords.search(browserResponse) 
                 
                     if (matchTotalRecords):
-                        if (DEBUG):
-                            logging.debug("GC Total Records: " + matchTotalRecords.group(1))
+                        self.__logging.debug("GC Total Records: " + matchTotalRecords.group(1))
             
                 # Link "Next" aufrufen
                 else:
@@ -647,8 +618,7 @@ class GCGetData(object):
 
                         if matchNextLink:
                         
-                            if DEBUG:
-                                logging.debug("GC Next Link found")
+                            self.__logging.debug("GC Next Link found")
                             
                             browser.select_form(nr=0)
                             browser.set_all_readonly(False)
@@ -664,8 +634,8 @@ class GCGetData(object):
                         
                             browserResponse = browser.response().read()
                         else:
-                            logging.debug("GC Next Link NOT found")
-                            logging.debug(browserResponse)
+                            self.__logging.debug("GC Next Link NOT found")
+                            self.__logging.debug(browserResponse)
                         
                             # Schleife beenden
                             foundEnough = True
@@ -678,24 +648,23 @@ class GCGetData(object):
                         if len(cacheDetailLinks) < amount:
                             if m[2].find("Premium Member Only Cache") == -1:
                                 if (m[1] != "8" or isGetMystery == True):
-                                    logging.debug("GC Cache Detail UID: " + m[0])
+                                    self.__logging.debug("GC Cache Detail UID: " + m[0])
                                     cacheDetailLinks.append(m[0])
                                 else:
-                                    logging.debug("GC Mystery Cache Detail UID: " + m[0] + " wird ausgelassen")
+                                    self.__logging.debug("GC Mystery Cache Detail UID: " + m[0] + " wird ausgelassen")
                             else:
-                                logging.info(m[0] + " = ist ein Premium Member only cache und wird ausgelassen.")
+                                self.__logging.info(m[0] + " = ist ein Premium Member only cache und wird ausgelassen.")
                         else:
                             foundEnough = True
                             break;
                         
             except Exception as ex:
-                logging.error("GC SearchStart failed - ex: " + str(ex))
+                self.__logging.error("GC SearchStart failed - ex: " + str(ex))
                 sys.exit(1)  
             
             nIndex = nIndex +1  
     
-        if (DEBUG):
-            logging.debug("GC SearchStart - Ende")
+        self.__logging.debug("GC SearchStart - Ende")
         
         return cacheDetailLinks
 
@@ -794,7 +763,7 @@ class GCGetData(object):
 '''
                 gpxTmpOutput = gpxTmpOutput.encode('utf-8')
             except Exception as ex:
-                logging.fatal(ex)
+                self.__logging.fatal(ex)
             
             if gpxTmpOutput and gpxTmpOutput != '':
                 gpxOutput += gpxTmpOutput
@@ -814,13 +783,13 @@ class GCGetData(object):
 
 
     def __SignOff(self, browser):
-        logging.debug("SignOff")
+        self.__logging.debug("SignOff")
         self.__RandomWait()
 
         url = "http://www.geocaching.com/login/default.aspx?RESET=Y"
         browser.open(url)
     
-        logging.debug(url)
+        self.__logging.debug(url)
     
         browser.response().read()
 
@@ -839,7 +808,7 @@ if __name__ == '__main__':
         GCGetData.Help()
         sys.exit(2)
         
-    DEBUG = False
+    debug = False
     
     userlogin = ''
     userPassword = ''
@@ -860,7 +829,7 @@ if __name__ == '__main__':
             GCGetData.Help()
             sys.exit()
         if o == "-d":
-            DEBUG = True
+            debug = True
         if o == "-c":
             amount = int(a)
             
@@ -880,13 +849,9 @@ if __name__ == '__main__':
     if isGetMystery:
         amount = 1
         
-    if (DEBUG):
-        logging.debug("Programm Start")
-
-    gcGetData = GCGetData()
+    gcGetData = GCGetData(debug)
 
     # load data
     gpxOutput = gcGetData.GetGPX(userLogin, userPassword, lat, lng, amount, isGetMystery, mysteryLat, mysteryLng)
     print(gpxOutput)
     
-    logging.info("Programm Ende")
