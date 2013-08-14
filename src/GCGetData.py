@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with AndNaviki; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-'''
+1'''
 
 # TODO
 #exiftool -exif:gpslatitude=52.000000 -exif:gpslatituderef=N -exif:gpslongitude=010.000000 -exif:gpslongituderef=E p10.jpg 
@@ -259,17 +259,6 @@ class GCGetData(object):
             else:
                 self.__logging.warn("SendToGPS - longitude not found")
         
-            # --- pt.created     = '2008-03-25T00:00:00';
-            reDate = re.compile("pt.created     = \'(.*?)\';")
-            mDate = reDate.search(browserResponse)
-        
-            if mDate:
-                cacheDetail.Created = mDate.group(1)
-            
-                self.__logging.debug("GC date: " + cacheDetail.Created)
-            else:
-                self.__logging.warn("SendToGPS - created not found")
-        
             # --- pt.id = 'GC1AJ40';
             reGCCode = re.compile("pt.id = \'(.*?)\';")
             mGCCode = reGCCode.search(browserResponse)
@@ -296,17 +285,6 @@ class GCGetData(object):
             else:
                 self.__logging.warn("SendToGPS - label not found")
             
-            # --- pt.owner       = 'kiowan';
-            reOwner = re.compile("pt.owner       = \'(.*?)\';")
-            mOwner = reOwner.search(browserResponse)
-        
-            if mOwner:
-                cacheDetail.Owner = mOwner.group(1)
-            
-                self.__logging.debug("GC owner: " + cacheDetail.Owner)
-            else:
-                self.__logging.warn("SendToGPS - owner not found")
-                    
             # --- pt.difficulty = 1;
             reDifficulty = re.compile("pt.difficulty = (.*?);")
             mDifficulty = reDifficulty.search(browserResponse)
@@ -340,39 +318,6 @@ class GCGetData(object):
             else:
                 self.__logging.warn("SendToGPS - type not found")
             
-            # --- pt.container   = 'Micro';
-            reContainer = re.compile("pt.container   = \'(.*?)\';")
-            mContainer = reContainer.search(browserResponse)
-        
-            if mContainer:
-                cacheDetail.Container = mContainer.group(1)
-            
-                self.__logging.debug("GC container: " + cacheDetail.Container)
-            else:
-                self.__logging.warn("SendToGPS - Container not found")
-        
-            # --- pt.country     = 'Germany';
-            reCountry = re.compile("pt.country     = \'(.*?)\';")
-            mCountry = reCountry.search(browserResponse)
-        
-            if mCountry:
-                cacheDetail.Country = mCountry.group(1)
-            
-                self.__logging.debug("GC country: " + cacheDetail.Country)
-            else:
-                self.__logging.warn("SendToGPS - country not found")
-            
-            # --- pt.state       = 'Niedersachsen';
-            reState = re.compile("pt.state       = \'(.*?)\';")
-            mState = reState.search(browserResponse)
-        
-            if mState:
-                cacheDetail.State = mState.group(1)
-            
-                self.__logging.debug("GC state: " + cacheDetail.State)
-            else:
-                self.__logging.warn("SendToGPS - state not found")
-        
         self.__logging.debug("GC download sendtogps - Ende - " + cacheUID)
 
     
@@ -408,6 +353,46 @@ class GCGetData(object):
             else:
                 self.__logging.warn("Details - GC ID not found")
                 
+            # --- owner
+            reOwnerCreated = re.compile("\) was created by (.*?) on (.*?)\.", re.S)
+            mOwnerCreated = reOwnerCreated.search(browserResponse)
+
+            if mOwnerCreated:
+                cacheDetail.Owner = mOwnerCreated.group(1)
+                cacheDetail.Created = mOwnerCreated.group(2)
+
+                self.__logging.debug("GC Owner: " + cacheDetail.Owner)
+                self.__logging.debug("GC Created: " + cacheDetail.Created)
+            else:
+                self.__logging.warn("Details - GC Owner not found")
+                self.__logging.warn("Details - GC Created not found")
+
+            # --- Container
+
+            reContainer = re.compile("It&#39;s a (.*?) size geocache, with difficult", re.S)
+            mContainer = reContainer.search(browserResponse)
+            
+            if mContainer:
+                cacheDetail.Container = mContainer.group(1)
+                
+                self.__logging.debug("GC Container: " + cacheDetail.Container)
+            else:
+                self.__logging.warn("Details - GC Container not found")
+
+            # --- country, state
+            reStateCountry = re.compile("It&#39;s located in (.*?), (.*?)\.", re.S)
+            mStateCountry = reStateCountry.search(browserResponse)
+
+            if mStateCountry:
+                cacheDetail.State = mStateCountry.group(1)
+                cacheDetail.Country = mStateCountry.group(2)
+
+                self.__logging.debug("GC State: " + cacheDetail.State)
+                self.__logging.debug("GC Country: " + cacheDetail.Country)
+            else:
+                self.__logging.warn("Details - State not found")
+                self.__logging.warn("Details - Country not found")
+
             # --- short desc
             reShortDesc = re.compile("\<span id=\"ctl00_ContentBody_ShortDescription\"\>(.*?)\</span\>", re.S)
             mShortDesc = reShortDesc.search(browserResponse)
