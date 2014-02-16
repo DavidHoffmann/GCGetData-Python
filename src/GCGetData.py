@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with AndNaviki; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-1'''
+'''
 
 # TODO
 #exiftool -exif:gpslatitude=52.000000 -exif:gpslatituderef=N -exif:gpslongitude=010.000000 -exif:gpslongituderef=E p10.jpg 
@@ -45,6 +45,7 @@ class GeoCache(object):
         self.Country = ''
         self.State = ''
         self.Guid = ''
+        self.Link = ''
         self.Archived = False
         self.Available = True
         self.Logs = []
@@ -123,24 +124,24 @@ class GCGetData(object):
             sys.exit(3)
 
         self.__logging.info("GC SearchNearest")
-        cacheDetailUIDs = self.__SearchNearest(self.__browser, lat, lng, amount, isGetMystery)
+        cacheDetailLinks = self.__SearchNearest(self.__browser, lat, lng, amount, isGetMystery)
 
         cacheDetails = []
         waypoints = []
 
         nCount = 1
  
-        if (cacheDetailUIDs) and (len(cacheDetailUIDs) > 0):
-            for cacheUID in cacheDetailUIDs:
+        if (cacheDetailLinks) and (len(cacheDetailLinks) > 0):
+            for cacheLink in cacheDetailLinks:
 
                 self.__logging.info("Download GC (" + str(nCount) + "/" + str(amount) + ")")
                 nCount = nCount + 1
 
                 cacheDetail = GeoCache()
-                cacheDetail.Guid = cacheUID
+                cacheDetail.Link = cacheLink
                 try:
-                    self.__DownloadCacheDetails(self.__browser, cacheUID, cacheDetail, waypoints)
-                    self.__DownloadSendToGPS(self.__browser, cacheUID, cacheDetail)
+                    self.__DownloadCacheDetails(self.__browser, cacheLink, cacheDetail, waypoints)
+                    self.__DownloadSendToGPS(self.__browser, cacheDetail.Guid, cacheDetail)
 
                     # Change Mystery-Coordinates                                                                                                        
                     if isGetMystery:
@@ -194,7 +195,7 @@ class GCGetData(object):
             url = "http://geocaching.com/login/"
             browser.open(url)
 
-            self.__logging.debug(url)
+            self.__logging.info(url)
         
             browser.select_form(nr = 0)
             browser["ctl00$ContentBody$tbUsername"] = userLogin
@@ -225,10 +226,11 @@ class GCGetData(object):
     
         try:
             self.__RandomWait()
-            url = "http://www.geocaching.com/seek/sendtogps.aspx?guid=" + cacheUID
+            url =  "http://www.geocaching.com/seek/sendtogps.aspx?guid=" + cacheUID
+
             browser.open(url)
         
-            self.__logging.debug(url)
+            self.__logging.info(url)
         
             browserResponse = browser.response().read()
         
@@ -321,17 +323,17 @@ class GCGetData(object):
         self.__logging.debug("GC download sendtogps - Ende - " + cacheUID)
 
     
-    def __DownloadCacheDetails(self, browser, cacheUID, cacheDetail, waypoints):
+    def __DownloadCacheDetails(self, browser, cacheLink, cacheDetail, waypoints):
     
-        self.__logging.debug("GC Download Cache Details - Start - " + cacheUID)
+        self.__logging.debug("GC Download Cache Details - Start - " + cacheLink)
     
         browserResponse = ""
         try:
             self.__RandomWait()
-            url = "http://www.geocaching.com/seek/cache_details.aspx?guid=" + cacheUID + "&log=y&decrypt=y"
+            url = cacheLink + "?log=y&decrypt=y"
             browser.open(url)
         
-            self.__logging.debug(url)
+            self.__logging.info(url)
         
             browserResponse = browser.response().read()
          
@@ -342,8 +344,18 @@ class GCGetData(object):
         
         if browserResponse and browserResponse != "":
         
+            # --- cache uid
+            reUID = re.compile("canonical\"\ href=\"http://www.geocaching.com/seek/cache_details.aspx\?guid=(.*?)\"", re.S)
+            mUID = reUID.search(browserResponse)
+
+            if mUID:
+                cacheDetail.Guid = mUID.group(1).strip()
+                self.__logging.debug("GC UID: " + cacheDetail.Guid)
+            else:
+                self.__logging.warn("Details - GC UID not found")
+
             # --- cache id - log.aspx?ID=
-            reGCID = re.compile("log.aspx\?ID=(.*?)\"", re.S)
+            reGCID = re.compile("log.aspx\?ID=(.*?)\&", re.S)
             mGCID = reGCID.search(browserResponse)
         
             if mGCID:
@@ -368,7 +380,6 @@ class GCGetData(object):
                 self.__logging.warn("Details - GC Created not found")
 
             # --- Container
-
             reContainer = re.compile("It&#39;s a (.*?) size geocache, with difficult", re.S)
             mContainer = reContainer.search(browserResponse)
             
@@ -492,7 +503,7 @@ class GCGetData(object):
 
                 self.__logging.debug("GC waypoints json: " + jsonLineW)
             
-        self.__logging.debug("GC Download Cache Details - Ende - " + cacheUID)
+        self.__logging.debug("GC Download Cache Details - Ende - " + cacheLink)
         
 
     def __GetJsonLog(self, cacheDetail, jsonLine):
@@ -582,7 +593,7 @@ class GCGetData(object):
                     url = "http://www.geocaching.com/seek/nearest.aspx?lat=" + lat + "&lng=" + lng + "&ex=1&cFilter=9a79e6ce-3344-409c-bbe9-496530baf758&children=n"
                     browser.open(url)
                 
-                    self.__logging.debug(url)
+                    self.__logging.info(url)
                 
                     browserResponse = browser.response().read()
                 
@@ -625,7 +636,7 @@ class GCGetData(object):
                             # Schleife beenden
                             foundEnough = True
                     
-                reCacheDetailLink = re.compile("cache_details\.aspx\?guid=(.*?)\"\ class=\"lnk\"><img.*?(\d{1})\.gif\".*?class=\"SearchResultsWptType\"(.*?)</tr>", re.S)
+                reCacheDetailLink = re.compile("//www.geocaching.com/geocache/(.*?)\"\ class=\"lnk.*?\"><img.*?(\d{1})\.gif\".*?class=\"SearchResultsWptType\"(.*?)</t")
                 matchCacheDetailLinks = re.findall(reCacheDetailLink, browserResponse)
                     
                 if matchCacheDetailLinks:
@@ -633,16 +644,19 @@ class GCGetData(object):
                         if len(cacheDetailLinks) < amount:
                             if m[2].find("Premium Member Only Cache") == -1:
                                 if (m[1] != "8" or isGetMystery == True):
-                                    self.__logging.debug("GC Cache Detail UID: " + m[0])
-                                    cacheDetailLinks.append(m[0])
+                                    self.__logging.debug("GC Cache Detail link: http://www.geocaching.com/geocache/" + m[0])
+                                    cacheDetailLinks.append('http://www.geocaching.com/geocache/' + m[0])
                                 else:
-                                    self.__logging.debug("GC Mystery Cache Detail UID: " + m[0] + " wird ausgelassen")
+                                    self.__logging.debug("GC Mystery Cache Detail link: http://www.geocaching.com/geocache/" + m[0] + " wird ausgelassen")
                             else:
                                 self.__logging.info(m[0] + " = ist ein Premium Member only cache und wird ausgelassen.")
                         else:
                             foundEnough = True
                             break;
-                        
+                else:
+                    self.__logging.warn("Cache detail link not found!")
+                    sys.exit(1)
+
             except Exception as ex:
                 self.__logging.error("GC SearchStart failed - ex: " + str(ex))
                 sys.exit(1)  
@@ -687,7 +701,7 @@ class GCGetData(object):
                 maxLng = wp.Longitude
     
         gpxOutput = '''<?xml version="1.0" encoding="utf-8"?>
-<gpx xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0" creator="Groundspeak, Inc. All  Rights Reserved. http://www.groundspeak.com" xsi:schemaLocation="http://www.topografix.com/GPX/1/0  http://www.topografix.com/GPX/1/0/gpx.xsd http://www.groundspeak.com/cache/1/0  http://www.groundspeak.com/cache/1/0/cache.xsd" xmlns="http://www.topografix.com/GPX/1/0">
+<gpx xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0" creator="Groundspeak, Inc. All  Rights Reserved. http://www.groundspeak.com" xsi:schemaLocation="http://www.topografix.com/GPX/1/0  http://www.topografix.com/GPX/1/0/gpx.xsd htvtp://www.groundspeak.com/cache/1/0  http://www.groundspeak.com/cache/1/0/cache.xsd" xmlns="http://www.topografix.com/GPX/1/0">
     <name>Braunschweig</name>
     <desc>Geocache file generated by GCGetData</desc>
     <author>Groundspeak</author>
@@ -774,7 +788,7 @@ class GCGetData(object):
         url = "http://www.geocaching.com/login/default.aspx?RESET=Y"
         browser.open(url)
     
-        self.__logging.debug(url)
+        self.__logging.info(url)
     
         browser.response().read()
 
